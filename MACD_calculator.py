@@ -1,21 +1,11 @@
 import yfinance as yf
+import pandas as pd
 from scipy.signal import find_peaks
 from datetime import datetime, timedelta
-import mplfinance as mpf
+from myfxbook_scrapper import get_short_percentage  # Import the get_short_percentage function
 
-def get_price_peak_and_macd(ticker, start_date, end_date, interval):
-    # Dictionary mapping tickers to their prominence values
-    prominence_dict = {
-        "USDJPY=X": 0.1,    # USD/JPY
-        "EURUSD=X": 0.001,  # EUR/USD
-        "GBPUSD=X": 0.001,  # GBP/USD
-        "AUDUSD=X": 0.001,  # AUD/USD
-        "USDCAD=X": 0.001   # USD/CAD
-    }
 
-    # Get the prominence value for the given ticker
-    prominence = prominence_dict.get(ticker, 0.001)  # Default to 0.001 if ticker is not in dictionary
-
+def get_price_peak_and_macd(ticker, start_date, end_date, interval, prominence, distance):
     # Fetch historical market data
     data = yf.download(ticker, start=start_date, end=end_date, interval=interval)
 
@@ -29,81 +19,151 @@ def get_price_peak_and_macd(ticker, start_date, end_date, interval):
     signal_line = macd_line.ewm(span=9, adjust=False).mean()  # 9-period EMA of MACD line
     macd_histogram = macd_line - signal_line
 
-    # Find peaks in the price series with prominence filtering
-    peaks, _ = find_peaks(close_prices, prominence=prominence)  # Use the dynamic prominence value
+    # Find peaks in the price series with prominence and distance filtering
+    peaks, _ = find_peaks(close_prices, prominence=prominence, distance=distance)
 
     # Get the most recent peak
     if len(peaks) > 0:
         most_recent_peak = peaks[-1]  # Get the last peak
     else:
         # If no peaks are found, return None for peak information
-        return None, None, data, macd_line, signal_line, macd_histogram, None
+        return None, None, data, macd_line, signal_line, macd_histogram
 
     # Prepare results for the most recent peak
     peak_info = {
         'Date': data.index[most_recent_peak],
-        'Price': f"{close_prices.iloc[most_recent_peak]:.4f}",  # Format price to 4 decimal places
-        'MACD': f"{macd_histogram.iloc[most_recent_peak]:.4f}"  # Format MACD to 4 decimal places
+        'Price': close_prices.iloc[most_recent_peak],  # Keep the price as a float
+        'MACD': macd_histogram.iloc[most_recent_peak]  # Keep MACD as a float
     }
 
     # Get the most recent price, date, and MACD value
     most_recent = {
         'Date': data.index[-1],
-        'Price': f"{close_prices.iloc[-1]:.4f}",  # Format price to 4 decimal places
-        'MACD': f"{macd_histogram.iloc[-1]:.4f}"  # Format MACD to 4 decimal places
+        'Price': close_prices.iloc[-1],  # Keep the price as a float
+        'MACD': macd_histogram.iloc[-1]  # Keep MACD as a float
     }
 
-    return peak_info, most_recent, data, macd_line, signal_line, macd_histogram, most_recent_peak
+    return peak_info, most_recent
 
-def plot_chart(data, macd_line, signal_line, macd_histogram, peak):
-    # Define additional plots for MACD
-    macd_addplot = [
-        mpf.make_addplot(macd_line, panel=1, color='blue', secondary_y=False, label='MACD Line'),
-        mpf.make_addplot(signal_line, panel=1, color='orange', secondary_y=False, label='Signal Line'),
-        mpf.make_addplot(macd_histogram, panel=1, type='bar', color='dimgray', secondary_y=True, label='Histogram')
+
+def look_for_signals():
+    tickers = ["USDJPY=X", "EURUSD=X", "GBPUSD=X", "AUDUSD=X", "USDCAD=X"]
+    start_dates = [
+        (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d'),  # 10 days back for 15m intervals
+        (datetime.now() - timedelta(days=20)).strftime('%Y-%m-%d'),  # 20 days back for 1h intervals
+        (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')  # 60 days back for 1d intervals
     ]
+    intervals = ["15m", "1h", "1d"]  # Updated intervals
 
-    # Extract peak date for vlines
-    peak_date = data.index[peak] if peak is not None else None
+    # Define custom prominence and distance values for each ticker, start date, and interval
+    parameters = {
+        "USDJPY=X": {
+            "prominence": [0.1, 0.2, 0.5],  # 15m, 1h, 1d example values
+            "distance": [10, 20, 30]  # 15m, 1h, 1d example values
+        },
+        "EURUSD=X": {
+            "prominence": [0.0001, 0.0002, 0.0005],
+            "distance": [5, 10, 15]
+        },
+        "GBPUSD=X": {
+            "prominence": [0.0001, 0.0002, 0.0005],
+            "distance": [5, 10, 15]
+        },
+        "AUDUSD=X": {
+            "prominence": [0.0001, 0.0002, 0.0005],
+            "distance": [5, 10, 15]
+        },
+        "USDCAD=X": {
+            "prominence": [0.0001, 0.0002, 0.0005],
+            "distance": [5, 10, 15]
+        }
+    }
 
-    # Plot the candlestick chart with MACD and vertical line at the peak
-    mpf.plot(
-        data,
-        type='candle',
-        style='yahoo',
-        title='Candlestick Chart with MACD (Last 10 Days)',
-        ylabel='Exchange Rate',
-        volume=True,  # Add volume to the chart
-        mav=(12, 26),  # Add moving averages (12 and 26-hour averages)
-        figratio=(14, 7),  # Aspect ratio of the plot
-        datetime_format='%b %d, %H:%M',  # Format for date-time labels
-        xrotation=45,  # Rotate x-axis labels for better readability
-        addplot=macd_addplot,
-        vlines=dict(
-            vlines=[peak_date] if peak_date is not None else [],  # Only add vertical line if peak_date is valid
-            linewidths=1,
-            colors='red',
-            alpha=0.7
-        )
-    )
+    results = []
+
+    for ticker in tickers:
+        ticker_name = ticker.split('=')[0]  # Remove '=X' part
+
+        # Get the percentage of people shorting this ticker once before looping through intervals
+        short_percentage_list = get_short_percentage(ticker_name)
+
+        # Handle the short percentage list
+        short_percentage = short_percentage_list[0] if short_percentage_list else None
+
+        for i in range(len(start_dates)):
+            start_date = start_dates[i]
+            interval = intervals[i]
+            end_date = datetime.now().strftime('%Y-%m-%d')
+
+            # Retrieve prominence and distance values for the current ticker and interval
+            ticker_params = parameters.get(ticker, {})
+            if not ticker_params:
+                raise ValueError(f"Parameters for ticker {ticker} are not provided.")
+
+            prominence = ticker_params.get('prominence')
+            distance = ticker_params.get('distance')
+
+            if prominence is None or distance is None:
+                raise ValueError(f"Prominence and/or distance not provided for ticker {ticker}.")
+
+            if i >= len(prominence) or i >= len(distance):
+                raise IndexError(f"Index {i} out of range for prominence or distance values for ticker {ticker}.")
+
+            prominence_value = prominence[i]
+            distance_value = distance[i]
+
+            # Get peak and MACD information
+            peak_info, recent = get_price_peak_and_macd(ticker, start_date, end_date, interval, prominence_value,
+                                                        distance_value)
+
+            if peak_info is not None:
+                # Calculate the price change and percentage change
+                price_change = recent['Price'] - peak_info['Price']
+                percentage_change = (price_change / peak_info['Price']) * 100
+
+                # Append results as a dictionary
+                results.append({
+                    'Ticker': ticker_name,
+                    'Interval': interval,
+                    'LAST PEAK DATE': peak_info['Date'],
+                    'LAST PEAK PRICE': f"{peak_info['Price']:.4f}",
+                    'LAST PEAK MACD': f"{peak_info['MACD']:.4f}",
+                    'RECENT PRICE DATE': recent['Date'],
+                    'RECENT PRICE': f"{recent['Price']:.4f}",
+                    'RECENT MACD': f"{recent['MACD']:.4f}",
+                    'PRICE CHANGE': f"{price_change:.4f}",
+                    'PERCENTAGE CHANGE': f"{percentage_change:.2f}%",
+                    'SHORT %': f"{short_percentage * 100:.2f}%" if short_percentage is not None else 'N/A'
+                })
+            else:
+                # Append results with N/A when no peak is found
+                results.append({
+                    'Ticker': ticker_name,
+                    'Interval': interval,
+                    'LAST PEAK DATE': 'N/A',
+                    'LAST PEAK PRICE': 'N/A',
+                    'LAST PEAK MACD': 'N/A',
+                    'RECENT PRICE DATE': recent['Date'],
+                    'RECENT PRICE': f"{recent['Price']:.4f}",
+                    'RECENT MACD': f"{recent['MACD']:.4f}",
+                    'PRICE CHANGE': 'N/A',
+                    'PERCENTAGE CHANGE': 'N/A',
+                    'SHORT %': f"{short_percentage * 100:.2f}%" if short_percentage is not None else 'N/A'
+                })
+
+    # Convert results to a DataFrame
+    df_results = pd.DataFrame(results)
+
+    return df_results
+
 
 # Example usage
-ticker = "EURUSD=X"
-start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
-end_date = datetime.now().strftime('%Y-%m-%d')
-interval = "1h"
+signal_results = look_for_signals()
 
-# Call the function to get the most recent peak and most recent data
-peak_info, recent, data, macd_line, signal_line, macd_histogram, peak_index = get_price_peak_and_macd(ticker, start_date, end_date, interval)
+# Set display options for Pandas DataFrame to show full content
+pd.set_option('display.max_columns', None)  # Show all columns
+pd.set_option('display.width', 1000)  # Set the display width to 1000 characters for full content
+pd.set_option('display.max_colwidth', None)  # No truncation of column content
 
-if peak_info is not None:
-    print("Most Recent Peak with MACD Level:")
-    print(f"Date: {peak_info['Date']}, Price: {peak_info['Price']}, MACD: {peak_info['MACD']}")
-else:
-    print("No peaks found in the given data.")
-
-print("\nMost Recent Data:")
-print(f"Date: {recent['Date']}, Price: {recent['Price']}, MACD: {recent['MACD']}")
-
-# Plot the chart with vertical line at the most recent peak
-plot_chart(data, macd_line, signal_line, macd_histogram, peak_index)
+# Print DataFrame results
+print(signal_results)
