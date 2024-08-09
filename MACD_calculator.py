@@ -134,7 +134,7 @@ def make_df():
                     'RECENT MACD': f"{recent['MACD']:.7f}",
                     'PRICE CHANGE': f"{price_change:.4f}",
                     'PERCENTAGE CHANGE': f"{percentage_change:.2f}%",
-                    'SHORT %': f"{short_percentage * 100:.2f}%" if short_percentage is not None else 'N/A'
+                    'SHORT %': f"{short_percentage * 100}" if short_percentage is not None else 'N/A'
                 })
             else:
                 # Append results with N/A when no peak is found
