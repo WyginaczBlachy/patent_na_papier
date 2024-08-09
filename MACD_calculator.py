@@ -4,7 +4,8 @@ from scipy.signal import find_peaks
 from datetime import datetime, timedelta
 from myfxbook_scrapper import get_short_percentage
 import os
-
+import schedule
+import time
 
 def get_price_peak_and_macd(ticker, start_date, end_date, interval, prominence, distance):
     # Fetch historical market data
@@ -165,12 +166,20 @@ def make_df():
 
     return df_results
 # Example usage
-print_in_consol = make_df()
+def job():
+    print(f"Starting signal retrieval at {datetime.now()}...")
 
-# Set display options for Pandas DataFrame to show full content
-pd.set_option('display.max_columns', None)  # Show all columns
-pd.set_option('display.width', 1000)  # Set the display width to 1000 characters for full content
-pd.set_option('display.max_colwidth', None)  # No truncation of column content
+    # Call the function to get signals and save to CSV
+    df_results = make_df()
 
-# Print DataFrame results
-print(print_in_consol)
+    # Print DataFrame results
+    print(df_results)
+
+
+# Schedule the job every `x` minutes
+interval_minutes = 10  # Change this to your desired interval
+schedule.every(interval_minutes).minutes.do(job)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)  # Wait for 1 second before checking the schedule again
