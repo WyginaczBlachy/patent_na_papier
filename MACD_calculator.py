@@ -177,7 +177,7 @@ def job():
 
 
 # Schedule the job every `x` minutes
-interval_minutes = 10  # Change this to your desired interval
+interval_minutes = 15  # Change this to your desired interval
 schedule.every(interval_minutes).minutes.do(job)
 
 while True:

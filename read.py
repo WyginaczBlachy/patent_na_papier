@@ -29,40 +29,73 @@ def evaluate_macd_price_correlation(df):
         '90m': (-12, 12)
     }
 
+    # Define customizable thresholds for each ticker
+    # Values here are in terms of percentage for price and absolute for MACD changes
+    thresholds = {
+        'USDCAD': {'price': {'15m': 0.001, '60m': 0.002, '90m': 0.003},
+                   'macd': {'15m': 0.1, '60m': 0.2, '90m': 0.3}},
+        'AUDUSD': {'price': {'15m': 0.0015, '60m': 0.0025, '90m': 0.0035},
+                   'macd': {'15m': 0.08, '60m': 0.18, '90m': 0.28}},
+        'GBPUSD': {'price': {'15m': 0.002, '60m': 0.003, '90m': 0.004},
+                   'macd': {'15m': 0.09, '60m': 0.19, '90m': 0.29}},
+        'EURUSD': {'price': {'15m': 0.0012, '60m': 0.0022, '90m': 0.0032},
+                   'macd': {'15m': 0.07, '60m': 0.17, '90m': 0.27}},
+        'USDJPY': {'price': {'15m': 0.001, '60m': 0.002, '90m': 0.003},
+                   'macd': {'15m': 0.05, '60m': 0.15, '90m': 0.25}}
+    }
+
     def evaluate(row):
         if pd.isna(row['LAST PEAK PRICE']) or pd.isna(row['RECENT PRICE']) or pd.isna(row['LAST PEAK MACD']) or pd.isna(
                 row['RECENT MACD']):
             return None
 
-        # Price and MACD differences
+        # Calculate price and MACD differences
         price_diff = row['RECENT PRICE'] - row['LAST PEAK PRICE']
         macd_diff = row['RECENT MACD'] - row['LAST PEAK MACD']
 
         # Determine evaluation points based on price and MACD movements
         interval = row.get('Interval', '15m')
+        ticker = row.get('Ticker', 'USDJPY')
+
+        # Retrieve thresholds for the current ticker and interval
+        ticker_thresholds = thresholds.get(ticker, {})
+        price_threshold = ticker_thresholds.get('price', {}).get(interval, 0.001)
+        macd_threshold = ticker_thresholds.get('macd', {}).get(interval, 0.1)
+
         min_points, max_points = interval_scoring.get(interval, (0, 0))
 
-        if price_diff == 0:
-            if macd_diff < 0:
-                return min_points  # Price stable, MACD falling (bearish)
-            elif macd_diff > 0:
-                return max_points  # Price stable, MACD rising (bullish)
-            else:
-                return 0  # Both stable
+        # Calculate relative price change
+        price_change_percentage = price_diff / row['LAST PEAK PRICE']
+
+        # Determine the direction of movement
+        price_direction = 1 if price_diff > 0 else -1
+        macd_direction = 1 if macd_diff > 0 else -1
+
+        # Evaluate price movement significance
+        if abs(price_change_percentage) < price_threshold:
+            price_score = 0  # Price change is insignificant
         elif price_diff > 0:
-            if macd_diff < 0:
-                return min_points  # Price rising, MACD falling (bearish)
-            elif macd_diff > 0:
-                return max_points  # Price rising, MACD rising (bullish)
-            else:
-                return min_points // 2  # Price rising, MACD stable (slightly bullish)
-        else:  # price_diff < 0
-            if macd_diff < 0:
-                return max_points // 2  # Price falling, MACD falling (slightly bullish)
-            elif macd_diff > 0:
-                return min_points  # Price falling, MACD rising (bearish)
-            else:
-                return 0  # Price falling, MACD stable (neutral)
+            price_score = max_points if price_change_percentage > price_threshold * 2 else max_points // 2
+        else:
+            price_score = min_points if price_change_percentage < -price_threshold * 2 else min_points // 2
+
+        # Evaluate MACD movement significance
+        if abs(macd_diff) < macd_threshold:
+            macd_score = 0  # MACD change is insignificant
+        elif macd_diff > 0:
+            macd_score = max_points if macd_diff > macd_threshold * 2 else max_points // 2
+        else:
+            macd_score = min_points if macd_diff < -macd_threshold * 2 else min_points // 2
+
+        # Combine price and MACD scores
+        if price_direction == macd_direction:
+            # Price and MACD move in the same direction, confirm trend
+            total_score = (price_score + macd_score) // 2  # Minimal points if aligned
+        else:
+            # Price and MACD move in opposite directions
+            total_score = price_score + macd_score
+
+        return total_score
 
     df['MACD-Price Evaluation'] = df.apply(evaluate, axis=1)
 
