@@ -165,12 +165,12 @@ def make_df():
 
     return df_results
 # Example usage
-#print_in_consol = make_df()
+print_in_consol = make_df()
 
 # Set display options for Pandas DataFrame to show full content
-#pd.set_option('display.max_columns', None)  # Show all columns
-#pd.set_option('display.width', 1000)  # Set the display width to 1000 characters for full content
-#pd.set_option('display.max_colwidth', None)  # No truncation of column content
+pd.set_option('display.max_columns', None)  # Show all columns
+pd.set_option('display.width', 1000)  # Set the display width to 1000 characters for full content
+pd.set_option('display.max_colwidth', None)  # No truncation of column content
 
 # Print DataFrame results
-#print(print_in_consol)
+print(print_in_consol)
