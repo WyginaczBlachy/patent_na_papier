@@ -2,7 +2,8 @@ import yfinance as yf
 import pandas as pd
 from scipy.signal import find_peaks
 from datetime import datetime, timedelta
-from myfxbook_scrapper import get_short_percentage  # Import the get_short_percentage function
+from myfxbook_scrapper import get_short_percentage
+import os
 
 
 def get_price_peak_and_macd(ticker, start_date, end_date, interval, prominence, distance):
@@ -46,36 +47,36 @@ def get_price_peak_and_macd(ticker, start_date, end_date, interval, prominence, 
     return peak_info, most_recent
 
 
-def look_for_signals():
+def make_df():
     tickers = ["USDJPY=X", "EURUSD=X", "GBPUSD=X", "AUDUSD=X", "USDCAD=X"]
     start_dates = [
-        (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d'),  # 10 days back for 15m intervals
-        (datetime.now() - timedelta(days=20)).strftime('%Y-%m-%d'),  # 20 days back for 1h intervals
-        (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')  # 60 days back for 1d intervals
+        (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d'),  # 2 days back for 15m intervals
+        (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d'),  # 10 days back for 1h intervals
+        (datetime.now() - timedelta(days=20)).strftime('%Y-%m-%d')  # 20 days back for 90min intervals
     ]
-    intervals = ["15m", "1h", "1d"]  # Updated intervals
+    intervals = ["15m", "60m", "90m"]  # Updated intervals
 
     # Define custom prominence and distance values for each ticker, start date, and interval
     parameters = {
         "USDJPY=X": {
-            "prominence": [0.1, 0.2, 0.5],  # 15m, 1h, 1d example values
-            "distance": [10, 20, 30]  # 15m, 1h, 1d example values
+            "prominence": [0.1, 0.2, 0.6],  # 15m, 1h, 90m example values
+            "distance": [3, 5, 16]  # 15m, 1h, 90m example values
         },
         "EURUSD=X": {
-            "prominence": [0.0001, 0.0002, 0.0005],
-            "distance": [5, 10, 15]
+            "prominence": [0.0002, 0.0007, 0.002],
+            "distance": [3, 5, 16]
         },
         "GBPUSD=X": {
-            "prominence": [0.0001, 0.0002, 0.0005],
-            "distance": [5, 10, 15]
+            "prominence": [0.0004, 0.0007, 0.0007],
+            "distance": [3, 8, 16]
         },
         "AUDUSD=X": {
-            "prominence": [0.0001, 0.0002, 0.0005],
-            "distance": [5, 10, 15]
+            "prominence": [0.0001, 0.0007, 0.0007],
+            "distance": [3, 5, 16]
         },
         "USDCAD=X": {
-            "prominence": [0.0001, 0.0002, 0.0005],
-            "distance": [5, 10, 15]
+            "prominence": [0.0003, 0.0009, 0.0009],
+            "distance": [3, 5, 16]
         }
     }
 
@@ -93,7 +94,7 @@ def look_for_signals():
         for i in range(len(start_dates)):
             start_date = start_dates[i]
             interval = intervals[i]
-            end_date = datetime.now().strftime('%Y-%m-%d')
+            end_date = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
 
             # Retrieve prominence and distance values for the current ticker and interval
             ticker_params = parameters.get(ticker, {})
@@ -127,10 +128,10 @@ def look_for_signals():
                     'Interval': interval,
                     'LAST PEAK DATE': peak_info['Date'],
                     'LAST PEAK PRICE': f"{peak_info['Price']:.4f}",
-                    'LAST PEAK MACD': f"{peak_info['MACD']:.4f}",
+                    'LAST PEAK MACD': f"{peak_info['MACD']:.7f}",
                     'RECENT PRICE DATE': recent['Date'],
                     'RECENT PRICE': f"{recent['Price']:.4f}",
-                    'RECENT MACD': f"{recent['MACD']:.4f}",
+                    'RECENT MACD': f"{recent['MACD']:.7f}",
                     'PRICE CHANGE': f"{price_change:.4f}",
                     'PERCENTAGE CHANGE': f"{percentage_change:.2f}%",
                     'SHORT %': f"{short_percentage * 100:.2f}%" if short_percentage is not None else 'N/A'
@@ -145,7 +146,7 @@ def look_for_signals():
                     'LAST PEAK MACD': 'N/A',
                     'RECENT PRICE DATE': recent['Date'],
                     'RECENT PRICE': f"{recent['Price']:.4f}",
-                    'RECENT MACD': f"{recent['MACD']:.4f}",
+                    'RECENT MACD': f"{recent['MACD']:.7f}",
                     'PRICE CHANGE': 'N/A',
                     'PERCENTAGE CHANGE': 'N/A',
                     'SHORT %': f"{short_percentage * 100:.2f}%" if short_percentage is not None else 'N/A'
@@ -154,16 +155,22 @@ def look_for_signals():
     # Convert results to a DataFrame
     df_results = pd.DataFrame(results)
 
+    output_dir = r"C:\Users\2001s\PycharmProjects\Jak poznać ślicznotkę życia\csvs"
+    os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    csv_filename = f"signals_{timestamp}.csv"
+    csv_file_path = os.path.join(output_dir, csv_filename)
+    df_results.to_csv(csv_file_path, index=False)
+
+
     return df_results
-
-
 # Example usage
-signal_results = look_for_signals()
+#print_in_consol = make_df()
 
 # Set display options for Pandas DataFrame to show full content
-pd.set_option('display.max_columns', None)  # Show all columns
-pd.set_option('display.width', 1000)  # Set the display width to 1000 characters for full content
-pd.set_option('display.max_colwidth', None)  # No truncation of column content
+#pd.set_option('display.max_columns', None)  # Show all columns
+#pd.set_option('display.width', 1000)  # Set the display width to 1000 characters for full content
+#pd.set_option('display.max_colwidth', None)  # No truncation of column content
 
 # Print DataFrame results
-print(signal_results)
+#print(print_in_consol)
