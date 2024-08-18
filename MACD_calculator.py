@@ -52,8 +52,8 @@ def make_df():
     tickers = ["USDJPY=X", "EURUSD=X", "GBPUSD=X", "AUDUSD=X", "USDCAD=X"]
     start_dates = [
         (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d'),  # 2 days back for 15m intervals
-        (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d'),  # 10 days back for 1h intervals
-        (datetime.now() - timedelta(days=20)).strftime('%Y-%m-%d')  # 20 days back for 90min intervals
+        (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d'),  # 10 days back for 60m intervals
+        (datetime.now() - timedelta(days=20)).strftime('%Y-%m-%d')  # 20 days back for 90m intervals
     ]
     intervals = ["15m", "60m", "90m"]  # Updated intervals
 
@@ -174,7 +174,7 @@ def job():
 
     # Print DataFrame results
     print(df_results)
-
+job()
 
 # Schedule the job every `x` minutes
 interval_minutes = 15  # Change this to your desired interval
