@@ -13,4 +13,4 @@ simulates buying and selling assets based on most current csv file at evals dire
 # run_pm
 runs portfolio_manager
 # plot chart
-plots chart of given asset in order to visualize logic used by machine
+plots chart of given asset in order for user to visualize logic used by machine
