@@ -1,2 +1,2 @@
 # patent_na_papier
-dzis robie siano jutro robie siano
+My attempt at implementing a systematic investing strategy using automation
